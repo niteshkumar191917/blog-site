@@ -9,13 +9,14 @@ function AllPosts() {
     const [loader, setLoader] = useState(true);
 
 
-    useEffect(() => { }, [])
-    appwriteService.getPosts([]).then((posts) => {
-        if (posts) {
-            setPosts(posts.documents)
-            setLoader(false);
-        }
-    })
+    useEffect(() => {
+        appwriteService.getPosts([]).then((posts) => {
+            if (posts) {
+                setPosts(posts.documents)
+                setLoader(false)
+            }
+        })
+    }, [])
 
     return (
         <div className='w-full py-8'>
