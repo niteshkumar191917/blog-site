@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input, RTE, Select } from "..";
 import appwriteService from "../../appwrite/config";
@@ -6,47 +6,52 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 export default function PostForm({ post }) {
-    const { register, handleSubmit, watch, setValue, control, getValues } = useForm({
+    const { register, handleSubmit, watch, setValue, control, getValues, formState } = useForm({
         defaultValues: {
             title: post?.title || "",
             slug: post?.$id || "",
             content: post?.content || "",
             status: post?.status || "active",
         },
+        reValidateMode: 'onChange',
     });
 
     const navigate = useNavigate();
     const userData = useSelector((state) => state.auth.userData);
+    const [error, setError] = useState("")
 
     const submit = async (data) => {
-        if (post) {
-            const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
+        setError("")
+        try {
+            if (post) {
+                const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
 
-            if (file) {
-                appwriteService.deleteFile(post.featuredImage);
-            }
+                if (file) {
+                    appwriteService.deleteFile(post.featuredImage);
+                }
 
-            const dbPost = await appwriteService.updatePost(post.$id, {
-                ...data,
-                featuredImage: file ? file.$id : undefined,
-            });
+                const dbPost = await appwriteService.updatePost(post.$id, {
+                    ...data,
+                    featuredImage: file ? file.$id : undefined,
+                });
 
-            if (dbPost) {
-                navigate(`/post/${dbPost.$id}`);
-            }
-        } else {            
-            const file = await appwriteService.uploadFile(data.image[0]);            
-            if (file) {               
-
-                const fileId = file.$id;
-                data.featuredImage = fileId;  
-                
-                        
-                const dbPost = await appwriteService.createPost({ ...data, userId: userData.$id });
                 if (dbPost) {
                     navigate(`/post/${dbPost.$id}`);
                 }
+            } else {
+                const file = await appwriteService.uploadFile(data.image[0]);
+                if (file) {
+
+                    const fileId = file.$id;
+                    data.featuredImage = fileId;
+                    const dbPost = await appwriteService.createPost({ ...data, userId: userData.$id });
+                    if (dbPost) {
+                        navigate(`/post/${dbPost.$id}`);
+                    }
+                }
             }
+        } catch (error) {
+            setError(error.message)
         }
     };
 
@@ -73,27 +78,47 @@ export default function PostForm({ post }) {
 
     return (
         <form onSubmit={handleSubmit(submit)} className="flex flex-wrap">
+            {error && <p className="text-red-600 mt-8 text-center">{error}</p>}
             <div className="w-2/3 px-2">
                 <Input
-                    label="Title :"
+                    label="Title* :"
                     placeholder="Title"
                     className="mb-4"
-                    {...register("title", { required: true })}
+                    {...register("title", {
+                        required: "Title is required",
+                    })}
+                    error={
+                        formState.errors.title &&
+                            (formState.isSubmitted || formState.touchedFields.title)
+                            ? formState.errors.title
+                            : null
+                    }
                 />
                 <Input
-                    label="Slug :"
+                    label="Slug* :"
                     placeholder="Slug"
                     className="mb-4"
-                    {...register("slug", { required: true })}
+                    {...register("slug", {
+                        required: true, maxLength: {
+                            value: 32,
+                            message: "Slug should not exceed 32 characters",
+                        },
+                    })}
                     onInput={(e) => {
                         setValue("slug", slugTransform(e.currentTarget.value), { shouldValidate: true });
                     }}
+                    error={
+                        formState.errors.slug &&
+                            (formState.isSubmitted || formState.touchedFields.slug)
+                            ? formState.errors.slug
+                            : null
+                    }
                 />
-                <RTE label="Content :" name="content" control={control} defaultValue={getValues("content")} />
+                <RTE label="Content* :" name="content" control={control} defaultValue={getValues("content")} />
             </div>
             <div className="w-1/3 px-2">
                 <Input
-                    label="Featured Image :"
+                    label="Featured Image* :"
                     type="file"
                     className="mb-4"
                     accept="image/png, image/jpg, image/jpeg, image/gif"
